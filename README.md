@@ -48,8 +48,8 @@ Hyperspectral-Analysis-System/
 │   │   │   ├── app.py
 │   │   │   ├── logo.png, logo.ico
 │   │   │   └── weights/a.npy … e.npy
-│   │   ├── App/                 large executable in Release
-│   │   └── installer/           Inno Setup source; large installer in Release
+│   │   ├── App/                 executable in Git LFS
+│   │   └── installer/           Inno Setup source; installer in Git LFS
 │   └── Raspi/
 │       ├── spectrum_app.py
 │       └── build_installer.bat
@@ -79,14 +79,9 @@ The five `.npy` weight files in `SRC/Window/Source code/weights/` must stay besi
 
 ## Windows executable and installer
 
-The supplied executable and installer each exceed GitHub's per-file Git limit. They are stored as independent ZIP assets in the [v1.0 Windows builds Release](https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/tag/v1.0-windows-builds):
+The supplied [application](SRC/Window/App/HyperspectralAnalysis.exe) and [installer](SRC/Window/installer/HyperspectralAnalysis_Setup.exe) are stored directly in their original folders using Git LFS.
 
-| Original file | Download and restore instructions |
-| --- | --- |
-| `SRC/Window/App/HyperspectralAnalysis.exe` | [Application folder README](SRC/Window/App/README.md) |
-| `SRC/Window/installer/HyperspectralAnalysis_Setup.exe` | [Installer folder README](SRC/Window/installer/README.md) |
-
-Extract each ZIP at the **repository root** to restore its original path. The Inno Setup definitions and build script remain in Git. The binaries were uploaded as received and have not been independently tested on a clean computer.
+Install Git LFS before cloning, and run `git lfs pull` in an existing clone to retrieve the complete files. The Inno Setup definitions and build script remain in Git. The binaries were uploaded as received and have not been independently tested on a clean computer.
 
 ## Evaluation and limits
 

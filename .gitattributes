@@ -1,0 +1,2 @@
+SRC/Window/App/HyperspectralAnalysis.exe filter=lfs diff=lfs merge=lfs -text
+SRC/Window/installer/HyperspectralAnalysis_Setup.exe filter=lfs diff=lfs merge=lfs -text
