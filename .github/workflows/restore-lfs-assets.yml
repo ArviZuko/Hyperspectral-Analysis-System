@@ -1,0 +1,164 @@
+name: Restore original large files with Git LFS
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/restore-lfs-assets.yml]
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore and verify released files
+        shell: python
+        run: |
+          import concurrent.futures, hashlib, json, os, pathlib, shutil, subprocess, zipfile
+          root = pathlib.Path.cwd()
+          config = json.loads("{\"name\":\"Hyperspectral-Analysis-System\",\"tag\":\"v1.0-windows-builds\",\"groups\":[{\"asset\":\"windows-app.zip\",\"expected\":[\"SRC/Window/App/HyperspectralAnalysis.exe\"],\"note\":\"SRC/Window/App/README.md\",\"assets\":[{\"name\":\"windows-app.zip\",\"size\":121369697,\"digest\":\"sha256:40d163444f897f2c54efe119697cc81bb273fa8487d0be79b011a2f7c581057f\",\"url\":\"https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/download/v1.0-windows-builds/windows-app.zip\"}],\"noteText\":\"# SRC/Window/App\\n\\nThe original `HyperspectralAnalysis.exe` exceeds GitHub’s per-file Git limit. Download [windows-app.zip](https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/download/v1.0-windows-builds/windows-app.zip) from the [Windows builds Release](https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/tag/v1.0-windows-builds) and extract it at the repository root. The archive preserves the original path and filename.\\n\"},{\"asset\":\"windows-installer.zip\",\"expected\":[\"SRC/Window/installer/HyperspectralAnalysis_Setup.exe\"],\"note\":\"SRC/Window/installer/README.md\",\"assets\":[{\"name\":\"windows-installer.zip\",\"size\":123940130,\"digest\":\"sha256:79d7dcc5f7f978ac7071b9c262027508c6f8eaf1bc9681e4e5b40b9b08fcd43e\",\"url\":\"https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/download/v1.0-windows-builds/windows-installer.zip\"}],\"noteText\":\"# SRC/Window/installer\\n\\nThe original `HyperspectralAnalysis_Setup.exe` exceeds GitHub’s per-file Git limit. Download [windows-installer.zip](https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/download/v1.0-windows-builds/windows-installer.zip) from the [Windows builds Release](https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/tag/v1.0-windows-builds) and extract it at the repository root. The archive preserves the original path and filename.\\n\"}],\"originalReadme\":\"# SPECTRUM — Hyperspectral Analysis System\\n\\nSPECTRUM is a PyQt6 desktop application that estimates a visible-range spectrum from an ordinary RGB image or camera feed. It uses a calibrated polynomial color transform and a compact principal-component basis to reconstruct **401 intensity values from 380 to 780 nm, at 1 nm spacing**. Users select regions of interest (ROIs), view their spectral curves, and export ROI data to Excel. The project was developed by **SpectraX (Sanket Dale)** at **Sanjivani University**, with **Arvind Mukundan** listed as mentor in the [project report](Documents/SPECTRUM_Project_Report%20%281%29.docx).\\n\\n> SPECTRUM estimates spectra from RGB; it does **not** measure them with a hyperspectral camera. Different physical spectra can produce the same RGB color, so the reconstructed curve is not a substitute for a calibrated spectral measurement.\\n\\n## Why the project exists\\n\\nAn RGB camera records three broad color channels, whereas a hyperspectral sensor samples many narrow wavelength bands. Dedicated sensors can be expensive or difficult to deploy for exploratory work. SPECTRUM explores a lower-cost software route: learn a relationship between RGB colors and reference spectra, then package that model with image capture, ROI analysis, plotting, and export tools. The research contribution described in the report is the **integration of a lightweight RGB-to-spectrum model with an interactive analysis workflow and several camera interfaces**, rather than a claim that three RGB values uniquely reveal the original spectrum.\\n\\n## How it works\\n\\n```text\\nStill image or camera frame\\n    → RGB conversion and 8 × 8 pixel-block averaging\\n    → polynomial expansion of each block's RGB values\\n    → regression into a six-component PCA spectral space\\n    → reconstruction of 401-band spectra\\n    → ROI masking and mean spectrum per ROI\\n    → live graph and Excel export\\n```\\n\\nThe supplied `weights/a.npy` through `e.npy` contain the regression matrix, six PCA basis vectors, mean spectrum, scaling values, and polynomial mode. In the current source, an image is divided into **8 × 8 pixel blocks** before reconstruction, so the resulting spectral grid is smaller than the original image. A selected ROI receives the **mean reconstructed spectrum** of the grid cells under its mask. The model produces spectral estimates for these blocks; it does not calculate an independently measured spectrum for every original pixel.\\n\\nThe source also defines helpers for peak wavelength, spectral energy, warm/cool labels, spectral similarity, and a rough correlated-color-temperature estimate. Some of those helpers are not connected to a visible control in the current main window. The interface does expose a multi-ROI spectral graph and an **Export Excel** action. See the [Windows application source](SRC/Window/Source%20code/app.py) for the implemented behavior and the [report](Documents/SPECTRUM_Project_Report%20%281%29.docx) for the wider research design.\\n\\n## What the current interface supports\\n\\n- **Inputs:** Load an image from disk or connect to a camera. The capture layer attempts standard OpenCV devices and has Raspberry Pi Picamera2 and GStreamer paths where those dependencies and devices are available.\\n- **ROIs:** Draw **point, rectangle, or ellipse** annotations, then zoom and compare their curves. Polygon masking exists in helper code, but the current toolbar does not offer a polygon button.\\n- **Visualisation:** Plot multiple ROI spectra over the 380–780 nm range in the Matplotlib panel.\\n- **Export:** Enter an ID, draw at least one ROI, then choose **Export Excel**. The application writes an `.xlsx` workbook to an `Exports/` directory beside the script or executable. A CSV-building helper is present in source, but the current UI exposes Excel export only.\\n- **Other controls:** Capture a camera frame, save the annotated image, clear annotations, or reset the session.\\n\\n## Repository structure\\n\\n```text\\nHyperspectral-Analysis-System/\\n├── README.md\\n├── Requirement.txt\\n├── Documents/\\n│   ├── SPECTRUM_Project_Report (1).docx\\n│   └── SPECTRUM_Presentation.pptx\\n├── Screenshot/\\n├── SRC/\\n│   ├── Window/\\n│   │   ├── Source code/\\n│   │   │   ├── app.py\\n│   │   │   ├── logo.png, logo.ico\\n│   │   │   └── weights/a.npy … e.npy\\n│   │   ├── App/                 large executable in Release\\n│   │   └── installer/           Inno Setup source; large installer in Release\\n│   └── Raspi/\\n│       ├── spectrum_app.py\\n│       └── build_installer.bat\\n└── Old_Version/                earlier viewer, DLLs, and correction/light files\\n```\\n\\nThe `Old_Version/` directory is preserved as supplied. It contains an earlier Windows viewer and third-party binary libraries; it is not required by the Python source described above. The [screenshots](Screenshot/) show the supplied application views.\\n\\nThe project report sketches a broader layout with training data, evaluation scripts, and an output directory. **Those folders were not present in the supplied project**, so this repository does not claim to reproduce model training or quantitative validation. The application creates its own `Exports/` directory at runtime.\\n\\n## Run the Windows Python source\\n\\nThe checked-in weights are already under the path expected by `app.py`. A typical Windows setup is:\\n\\n```powershell\\ngit clone https://github.com/ArviZuko/Hyperspectral-Analysis-System.git\\ncd Hyperspectral-Analysis-System\\npython -m venv .venv\\n.\\\\.venv\\\\Scripts\\\\Activate.ps1\\npython -m pip install -r Requirement.txt\\npython \\\"SRC\\\\Window\\\\Source code\\\\app.py\\\"\\n```\\n\\nThe five `.npy` weight files in `SRC/Window/Source code/weights/` must stay beside the application source. To analyse a still image, choose **Load Image**, draw one or more ROIs, enter an export ID, and click **Export Excel**. For live input, choose **Connect Camera**, then **Capture Image** before annotating the captured frame. Camera support depends on installed drivers and the OpenCV/Picamera2/GStreamer build available on the machine.\\n\\n[`SRC/Raspi/spectrum_app.py`](SRC/Raspi/spectrum_app.py) is the Raspberry Pi variant. It uses the same broad application design, but Pi-specific camera packages and a device-specific Python environment may be needed; `Requirement.txt` alone does not install Picamera2 or a GStreamer runtime.\\n\\n## Windows executable and installer\\n\\nThe supplied executable and installer each exceed GitHub's per-file Git limit. They are stored as independent ZIP assets in the [v1.0 Windows builds Release](https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/tag/v1.0-windows-builds):\\n\\n| Original file | Download and restore instructions |\\n| --- | --- |\\n| `SRC/Window/App/HyperspectralAnalysis.exe` | [Application folder README](SRC/Window/App/README.md) |\\n| `SRC/Window/installer/HyperspectralAnalysis_Setup.exe` | [Installer folder README](SRC/Window/installer/README.md) |\\n\\nExtract each ZIP at the **repository root** to restore its original path. The Inno Setup definitions and build script remain in Git. The binaries were uploaded as received and have not been independently tested on a clean computer.\\n\\n## Evaluation and limits\\n\\nThe report presents example curves from multiple ROIs and describes differences between selected regions. It does **not** provide a reproducible numerical reconstruction-accuracy benchmark for the files in this repository. Because recovery from RGB is underdetermined, accuracy depends on the training spectra, camera response, exposure, white balance, and illumination. Metameric materials may remain indistinguishable. Use controlled capture conditions and validate the model against measured spectra before drawing scientific or production conclusions.\\n\\n## Documentation and reuse\\n\\n- [Project report](Documents/SPECTRUM_Project_Report%20%281%29.docx)\\n- [Presentation](Documents/SPECTRUM_Presentation.pptx)\\n- [Screenshots](Screenshot/)\\n\\nNo project-level license was supplied. Check the rights for the source, report, and older bundled binary libraries before reuse or redistribution.\\n\",\"updatedReadme\":\"# SPECTRUM — Hyperspectral Analysis System\\n\\nSPECTRUM is a PyQt6 desktop application that estimates a visible-range spectrum from an ordinary RGB image or camera feed. It uses a calibrated polynomial color transform and a compact principal-component basis to reconstruct **401 intensity values from 380 to 780 nm, at 1 nm spacing**. Users select regions of interest (ROIs), view their spectral curves, and export ROI data to Excel. The project was developed by **SpectraX (Sanket Dale)** at **Sanjivani University**, with **Arvind Mukundan** listed as mentor in the [project report](Documents/SPECTRUM_Project_Report%20%281%29.docx).\\n\\n> SPECTRUM estimates spectra from RGB; it does **not** measure them with a hyperspectral camera. Different physical spectra can produce the same RGB color, so the reconstructed curve is not a substitute for a calibrated spectral measurement.\\n\\n## Why the project exists\\n\\nAn RGB camera records three broad color channels, whereas a hyperspectral sensor samples many narrow wavelength bands. Dedicated sensors can be expensive or difficult to deploy for exploratory work. SPECTRUM explores a lower-cost software route: learn a relationship between RGB colors and reference spectra, then package that model with image capture, ROI analysis, plotting, and export tools. The research contribution described in the report is the **integration of a lightweight RGB-to-spectrum model with an interactive analysis workflow and several camera interfaces**, rather than a claim that three RGB values uniquely reveal the original spectrum.\\n\\n## How it works\\n\\n```text\\nStill image or camera frame\\n    → RGB conversion and 8 × 8 pixel-block averaging\\n    → polynomial expansion of each block's RGB values\\n    → regression into a six-component PCA spectral space\\n    → reconstruction of 401-band spectra\\n    → ROI masking and mean spectrum per ROI\\n    → live graph and Excel export\\n```\\n\\nThe supplied `weights/a.npy` through `e.npy` contain the regression matrix, six PCA basis vectors, mean spectrum, scaling values, and polynomial mode. In the current source, an image is divided into **8 × 8 pixel blocks** before reconstruction, so the resulting spectral grid is smaller than the original image. A selected ROI receives the **mean reconstructed spectrum** of the grid cells under its mask. The model produces spectral estimates for these blocks; it does not calculate an independently measured spectrum for every original pixel.\\n\\nThe source also defines helpers for peak wavelength, spectral energy, warm/cool labels, spectral similarity, and a rough correlated-color-temperature estimate. Some of those helpers are not connected to a visible control in the current main window. The interface does expose a multi-ROI spectral graph and an **Export Excel** action. See the [Windows application source](SRC/Window/Source%20code/app.py) for the implemented behavior and the [report](Documents/SPECTRUM_Project_Report%20%281%29.docx) for the wider research design.\\n\\n## What the current interface supports\\n\\n- **Inputs:** Load an image from disk or connect to a camera. The capture layer attempts standard OpenCV devices and has Raspberry Pi Picamera2 and GStreamer paths where those dependencies and devices are available.\\n- **ROIs:** Draw **point, rectangle, or ellipse** annotations, then zoom and compare their curves. Polygon masking exists in helper code, but the current toolbar does not offer a polygon button.\\n- **Visualisation:** Plot multiple ROI spectra over the 380–780 nm range in the Matplotlib panel.\\n- **Export:** Enter an ID, draw at least one ROI, then choose **Export Excel**. The application writes an `.xlsx` workbook to an `Exports/` directory beside the script or executable. A CSV-building helper is present in source, but the current UI exposes Excel export only.\\n- **Other controls:** Capture a camera frame, save the annotated image, clear annotations, or reset the session.\\n\\n## Repository structure\\n\\n```text\\nHyperspectral-Analysis-System/\\n├── README.md\\n├── Requirement.txt\\n├── Documents/\\n│   ├── SPECTRUM_Project_Report (1).docx\\n│   └── SPECTRUM_Presentation.pptx\\n├── Screenshot/\\n├── SRC/\\n│   ├── Window/\\n│   │   ├── Source code/\\n│   │   │   ├── app.py\\n│   │   │   ├── logo.png, logo.ico\\n│   │   │   └── weights/a.npy … e.npy\\n│   │   ├── App/                 executable in Git LFS\\n│   │   └── installer/           Inno Setup source; installer in Git LFS\\n│   └── Raspi/\\n│       ├── spectrum_app.py\\n│       └── build_installer.bat\\n└── Old_Version/                earlier viewer, DLLs, and correction/light files\\n```\\n\\nThe `Old_Version/` directory is preserved as supplied. It contains an earlier Windows viewer and third-party binary libraries; it is not required by the Python source described above. The [screenshots](Screenshot/) show the supplied application views.\\n\\nThe project report sketches a broader layout with training data, evaluation scripts, and an output directory. **Those folders were not present in the supplied project**, so this repository does not claim to reproduce model training or quantitative validation. The application creates its own `Exports/` directory at runtime.\\n\\n## Run the Windows Python source\\n\\nThe checked-in weights are already under the path expected by `app.py`. A typical Windows setup is:\\n\\n```powershell\\ngit clone https://github.com/ArviZuko/Hyperspectral-Analysis-System.git\\ncd Hyperspectral-Analysis-System\\npython -m venv .venv\\n.\\\\.venv\\\\Scripts\\\\Activate.ps1\\npython -m pip install -r Requirement.txt\\npython \\\"SRC\\\\Window\\\\Source code\\\\app.py\\\"\\n```\\n\\nThe five `.npy` weight files in `SRC/Window/Source code/weights/` must stay beside the application source. To analyse a still image, choose **Load Image**, draw one or more ROIs, enter an export ID, and click **Export Excel**. For live input, choose **Connect Camera**, then **Capture Image** before annotating the captured frame. Camera support depends on installed drivers and the OpenCV/Picamera2/GStreamer build available on the machine.\\n\\n[`SRC/Raspi/spectrum_app.py`](SRC/Raspi/spectrum_app.py) is the Raspberry Pi variant. It uses the same broad application design, but Pi-specific camera packages and a device-specific Python environment may be needed; `Requirement.txt` alone does not install Picamera2 or a GStreamer runtime.\\n\\n## Windows executable and installer\\n\\nThe supplied [application](SRC/Window/App/HyperspectralAnalysis.exe) and [installer](SRC/Window/installer/HyperspectralAnalysis_Setup.exe) are stored directly in their original folders using Git LFS.\\n\\nInstall Git LFS before cloning, and run `git lfs pull` in an existing clone to retrieve the complete files. The Inno Setup definitions and build script remain in Git. The binaries were uploaded as received and have not been independently tested on a clean computer.\\n\\n## Evaluation and limits\\n\\nThe report presents example curves from multiple ROIs and describes differences between selected regions. It does **not** provide a reproducible numerical reconstruction-accuracy benchmark for the files in this repository. Because recovery from RGB is underdetermined, accuracy depends on the training spectra, camera response, exposure, white balance, and illumination. Metameric materials may remain indistinguishable. Use controlled capture conditions and validate the model against measured spectra before drawing scientific or production conclusions.\\n\\n## Documentation and reuse\\n\\n- [Project report](Documents/SPECTRUM_Project_Report%20%281%29.docx)\\n- [Presentation](Documents/SPECTRUM_Presentation.pptx)\\n- [Screenshots](Screenshot/)\\n\\nNo project-level license was supplied. Check the rights for the source, report, and older bundled binary libraries before reuse or redistribution.\\n\",\"workflowPath\":\".github/workflows/restore-lfs-assets.yml\"}")
+          temp = pathlib.Path(os.environ["RUNNER_TEMP"]) / "restore-lfs-assets"
+          temp.mkdir(exist_ok=True)
+          def run(*args, **kwargs):
+              return subprocess.run(args, check=True, **kwargs)
+          def digest(path, algorithm="sha256"):
+              with open(path, "rb") as stream:
+                  return hashlib.file_digest(stream, algorithm).hexdigest()
+          def safe_path(name):
+              relative = pathlib.PurePosixPath(name.replace("\\", "/"))
+              assert not relative.is_absolute() and ".." not in relative.parts and ".git" not in relative.parts, name
+              return relative.as_posix()
+          assets = {a["name"]: a for g in config["groups"] for a in g["assets"]}
+          def download(asset):
+              print("Downloading", asset["name"], flush=True)
+              target = temp / asset["name"]
+              run("curl", "--fail", "--location", "--retry", "5", "--connect-timeout", "30", "--speed-time", "60", "--speed-limit", "1024", "--max-time", "1800", "--silent", "--show-error", "-o", str(target), asset["url"])
+              assert target.stat().st_size == asset["size"], asset["name"]
+              assert "sha256:" + digest(target) == asset["digest"], asset["name"]
+              print("Verified download", asset["name"], flush=True)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+              list(pool.map(download, assets.values()))
+          run("git", "lfs", "install", "--local")
+          records = {}
+          group_skipped = {}
+          original_tracked = set(subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0"))
+          for group in config["groups"]:
+              print("Restoring", group["assets"][0]["name"], flush=True)
+              skipped = []
+              staged_paths = []
+              def restore(name, size, stream_factory):
+                  name = safe_path(name)
+                  if size > 2 * 1024**3:
+                      skipped.append({"path": name, "size": size})
+                      print("Retained in Releases due to LFS size limit:", name, size, flush=True)
+                      return
+                  destination = root / name
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  candidate = temp / "current-file"
+                  sha256 = hashlib.sha256()
+                  sha1 = hashlib.sha1(("blob " + str(size) + "\0").encode())
+                  with stream_factory() as source, open(candidate, "wb") as output:
+                      while chunk := source.read(1024 * 1024):
+                          output.write(chunk)
+                          sha256.update(chunk)
+                          sha1.update(chunk)
+                  assert candidate.stat().st_size == size, name
+                  content_sha256 = sha256.hexdigest()
+                  if destination.exists():
+                      if destination.stat().st_size < 256 and destination.read_bytes().startswith(b"version https://git-lfs.github.com/spec/v1\n"):
+                          pointer = destination.read_text()
+                          assert "oid sha256:" + content_sha256 + "\n" in pointer and "\nsize " + str(size) + "\n" in pointer, name
+                      else:
+                          assert digest(destination) == content_sha256, "Existing file differs: " + name
+                  shutil.move(str(candidate), str(destination))
+                  lfs = size >= 50 * 1024**2
+                  if lfs:
+                      run("git", "lfs", "track", "--filename", name)
+                      pointer = ("version https://git-lfs.github.com/spec/v1\noid sha256:" + content_sha256 + "\nsize " + str(size) + "\n").encode()
+                      expected_blob = hashlib.sha1(("blob " + str(len(pointer)) + "\0").encode() + pointer).hexdigest()
+                  else:
+                      expected_blob = sha1.hexdigest()
+                  records[name] = {"path": name, "size": size, "sha256": content_sha256, "blob": expected_blob, "lfs": lfs, "new": name not in original_tracked}
+                  staged_paths.append(name)
+              asset_paths = [temp / a["name"] for a in group["assets"]]
+              if group.get("dest"):
+                  asset = group["assets"][0]
+                  restore(group["dest"], asset["size"], lambda: open(asset_paths[0], "rb"))
+              else:
+                  archive_path = asset_paths[0]
+                  if len(asset_paths) > 1:
+                      archive_path = temp / "joined.zip"
+                      with open(archive_path, "wb") as output:
+                          for part in asset_paths:
+                              with open(part, "rb") as source:
+                                  shutil.copyfileobj(source, output)
+                  with zipfile.ZipFile(archive_path) as archive:
+                      members = [m for m in archive.infolist() if not m.is_dir()]
+                      names = [safe_path(str(pathlib.PurePosixPath(group.get("prefix", "")) / safe_path(m.filename))) for m in members]
+                      assert len(names) == len(set(names)), "Repeated archive path"
+                      if group.get("expected"):
+                          assert set(names) == set(group["expected"]), (names, group["expected"])
+                      for member, name in zip(members, names):
+                          restore(name, member.file_size, lambda m=member: archive.open(m))
+                  if len(asset_paths) > 1:
+                      archive_path.unlink()
+              for asset_path in asset_paths:
+                  asset_path.unlink()
+              for offset in range(0, len(staged_paths), 100):
+                  run("git", "add", "-f", "--", *staged_paths[offset:offset+100])
+              for name in staged_paths:
+                  if records[name]["lfs"]:
+                      (root / name).unlink()
+              note = group.get("note")
+              if note:
+                  path = root / note
+                  assert path.read_text() == group["noteText"], "Download note changed: " + note
+                  if skipped:
+                      text = path.read_text()
+                      addition = "\nFiles within the GitHub LFS size limit are now restored in their original locations. The following originals remain in Releases because they exceed the per-file limit:\n\n" + "\n".join("- " + item["path"] + " (" + str(item["size"]) + " bytes)" for item in skipped) + "\n"
+                      path.write_text(text.split("\n",1)[0] + "\n" + addition + "\n" + text.split("\n",1)[1])
+                      run("git", "add", "--", note)
+                  else:
+                      run("git", "rm", "-f", "--", note)
+              group_skipped[group["assets"][0]["name"]] = skipped
+          ignore = root / ".gitignore"
+          if ignore.exists() and config.get("ignoreRemove"):
+              lines = ignore.read_text().splitlines()
+              ignore.write_text("\n".join(line for line in lines if line not in config["ignoreRemove"]) + "\n")
+              run("git", "add", "--", ".gitignore")
+          readme = root / "README.md"
+          assert readme.read_text() == config["originalReadme"], "Main README changed"
+          readme.write_text(config["updatedReadme"])
+          run("git", "add", "-f", "--", ".gitattributes", "README.md")
+          if config.get("modelsIndex"):
+              index_path = root / "Models/README.md"
+              assert index_path.read_text() == config["modelsIndex"]["original"]
+              skipped_notes = {g["note"] for g in config["groups"] if g.get("note") and group_skipped[g["assets"][0]["name"]]}
+              text = "# SAVE model files\n\nRestored model artifacts are stored at their original paths. Files larger than 50 MiB use Git LFS; install Git LFS before cloning and run git lfs pull in an existing clone.\n\n## Files retained in Releases\n\nThe following folder notes describe files that exceed GitHub's LFS per-file size limit:\n\n"
+              for note in sorted(skipped_notes):
+                  from urllib.parse import quote
+                  text += "- [" + note.removeprefix("Models/").removesuffix("/README.md") + "](" + quote(note.removeprefix("Models/")) + ")\n"
+              index_path.write_text(text)
+              run("git", "add", "--", "Models/README.md")
+          index = {}
+          for row in subprocess.check_output(["git", "ls-files", "--stage", "-z"]).split(b"\0"):
+              if row:
+                  metadata, name = row.split(b"\t", 1)
+                  index[name.decode()] = metadata.decode().split()[1]
+          assert records, "No restored files"
+          for name, record in records.items():
+              assert index.get(name) == record["blob"], "Staged contents mismatch: " + name
+          report = {"restoredFiles": list(records.values()), "retainedInReleases": [item for group in group_skipped.values() for item in group], "newFiles": sum(r["new"] for r in records.values()), "lfsFiles": sum(r["lfs"] for r in records.values())}
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("Restored " + str(len(records)) + " files (" + str(report["lfsFiles"]) + " using Git LFS). Retained " + str(len(report["retainedInReleases"])) + " oversized originals in Releases.\n\n")
+              for item in report["retainedInReleases"]:
+                  summary.write("- " + item["path"] + ": " + str(item["size"]) + " bytes\n")
+          print("MIGRATION_REPORT " + json.dumps(report), flush=True)
+          run("git", "rm", config["workflowPath"])
+          run("git", "config", "user.name", "github-actions[bot]")
+          run("git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
+          run("git", "commit", "--quiet", "-m", "Restore release-hosted files to their original folders with Git LFS")
+          run("git", "push", "origin", "HEAD:main")
+          
