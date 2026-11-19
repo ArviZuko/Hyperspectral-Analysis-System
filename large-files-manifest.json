@@ -1,0 +1,30 @@
+{
+  "files": [
+    {
+      "path": "SRC/Window/App/HyperspectralAnalysis.exe",
+      "size": 121369519,
+      "sha256": "1c406c998ccdfa6e6c6be2788c7284963fe627538b3cdbbed776333ad6361e36",
+      "parts": [
+        {
+          "url": "https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/download/large-files-no-lfs/HyperspectralAnalysis.exe",
+          "size": 121369519,
+          "sha256": "1c406c998ccdfa6e6c6be2788c7284963fe627538b3cdbbed776333ad6361e36",
+          "name": "HyperspectralAnalysis.exe"
+        }
+      ]
+    },
+    {
+      "path": "SRC/Window/installer/HyperspectralAnalysis_Setup.exe",
+      "size": 123939928,
+      "sha256": "e0b46a547fe5de8a2f085474e432b2f15d96a3e6344907f32c6793a45fe959df",
+      "parts": [
+        {
+          "url": "https://github.com/ArviZuko/Hyperspectral-Analysis-System/releases/download/large-files-no-lfs/HyperspectralAnalysis_Setup.exe",
+          "size": 123939928,
+          "sha256": "e0b46a547fe5de8a2f085474e432b2f15d96a3e6344907f32c6793a45fe959df",
+          "name": "HyperspectralAnalysis_Setup.exe"
+        }
+      ]
+    }
+  ]
+}
